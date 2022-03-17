@@ -1,0 +1,79 @@
+version: "3.9"
+
+networks :
+    nginx-php81-mysql8-node:
+
+services:
+
+  # mysql
+  mysql8-service:
+    image: mysql:8
+    container_name: mysql8-container
+    ports:
+        - "4306:3306"
+    volumes:
+        - ./api/mysql:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    restart: always # always restart unless stopped manually
+    environment:
+        MYSQL_ROOT_PASSWORD: secret
+        MYSQL_PASSWORD: secret
+    networks:
+    - nginx-php81-mysql8-node
+
+  # phpmyadmin  
+  phpmyadmin-service:
+    image: phpmyadmin
+    container_name: phpmyadmin_container
+    restart: always
+    depends_on:
+      - mysql8-service
+    ports:
+      - 8080:80
+    environment:
+      PMA_HOST: mysql8-service
+    networks:
+      - nginx-php81-mysql8-node
+
+  # maildev
+  maildev-service:
+    image: maildev/maildev
+    container_name: maildev_container
+    command: bin/maildev --web 80 --smtp 25 --hide-extensions STARTTLS
+    ports:
+      - "8081:80"
+    restart: always
+    networks:
+      - nginx-php81-mysql8-node
+
+  # php8-symfony6
+  api-service:
+    container_name: api-container
+    build: api
+    ports:
+      - "9000:8000"
+    volumes:
+      - ./api:/var/www/html
+    networks:
+      - nginx-php81-mysql8-node
+
+  # app react
+  app-service:
+    container_name: app-container
+    stdin_open: true
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    build: app
+    volumes:
+      - /app/node_modules
+      - ./app:/app
+    expose:
+      - 3000
+    ports:
+      - 3000:3000
+    networks:
+      - nginx-php81-mysql8-node
+
+
+volumes:
+  db-data:
